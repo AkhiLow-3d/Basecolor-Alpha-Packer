@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BaseColor + Alpha Packer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 960px;
+      margin: 24px auto;
+      padding: 0 16px;
+      line-height: 1.5;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-top: 0;
+      color: #444;
+    }
+
+    .panel {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .panel-info {
+      flex: 1 1 auto;
+    }
+
+    .preview-wrapper {
+      width: 180px;
+      text-align: center;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .preview-wrapper img {
+      width: 100%;
+      height: 180px;
+      object-fit: contain;
+      border: 1px solid #ccc;
+      background: #f3f3f3;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .dropzone {
+      border: 2px dashed #888;
+      border-radius: 6px;
+      padding: 14px;
+      text-align: center;
+      color: #555;
+      cursor: pointer;
+      margin-bottom: 8px;
+      user-select: none;
+    }
+
+    .dropzone.dragover {
+      border-color: #0078d4;
+      background: #eef6ff;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      margin-bottom: 6px;
+    }
+
+    .file-name {
+      font-size: 12px;
+      color: #666;
+      word-break: break-all;
+      min-height: 18px;
+    }
+
+    .options,
+    .actions,
+    .result-section {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .options label.checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: normal;
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 10px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+
+    #resultPreview {
+      max-width: 100%;
+      max-height: 320px;
+      border: 1px solid #ccc;
+      background:
+        linear-gradient(45deg, #ddd 25%, transparent 25%),
+        linear-gradient(-45deg, #ddd 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ddd 75%),
+        linear-gradient(-45deg, transparent 75%, #ddd 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+      display: block;
+    }
+
+    .note {
+      font-size: 13px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>BaseColor + Alpha Packer</h1>
+  <p>
+    BaseColor画像のRGBと、Alpha画像のグレースケールを1枚のPNGにまとめます。<br />
+    Unity Built-in の Standard Shader（Transparent）で使う前提です。処理はブラウザ内だけで完結します。
+  </p>
+
+  <div class="panel">
+    <div class="panel-info">
+      <label for="fileBaseColor">BaseColor（RGB）</label>
+      <div class="dropzone" data-target="baseColor">ここにBaseColor画像をドラッグ＆ドロップ / クリックして選択</div>
+      <input type="file" id="fileBaseColor" accept="image/*" />
+      <div id="fileNameBaseColor" class="file-name"></div>
+    </div>
+    <div class="preview-wrapper">
+      <img id="previewBaseColor" alt="BaseColor Preview" />
+      <div>BaseColor Preview</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-info">
+      <label for="fileAlpha">Alpha（グレースケール）</label>
+      <div class="dropzone" data-target="alpha">ここにAlpha画像をドラッグ＆ドロップ / クリックして選択</div>
+      <input type="file" id="fileAlpha" accept="image/*" />
+      <div id="fileNameAlpha" class="file-name"></div>
+    </div>
+    <div class="preview-wrapper">
+      <img id="previewAlpha" alt="Alpha Preview" />
+      <div>Alpha Preview</div>
+    </div>
+  </div>
+
+  <div class="options">
+    <h2 style="margin-top:0; font-size:18px;">オプション</h2>
+    <label class="checkbox">
+      <input type="checkbox" id="useAlphaImageChannel" checked />
+      Alpha画像の元画像Alphaチャンネルを優先して使う（なければR値を使う）
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="invertAlpha" />
+      Alphaを反転する
+    </label>
+    <div class="note">
+      通常はチェック初期値のままでOKです。Alpha画像が白黒画像なら、そのまま使えます。
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="packBtn">パックしてダウンロード</button>
+    <button id="clearBtn" type="button">クリア</button>
+  </div>
+
+  <div class="result-section">
+    <h2 style="margin-top:0; font-size:18px;">結果プレビュー</h2>
+    <img id="resultPreview" alt="Packed Result Preview" />
+    <p class="note">
+      出力PNGは RGB = BaseColor、A = Alpha です。UnityではこのPNGを Albedo に入れてください。
+    </p>
+  </div>
+
+  <canvas id="resultCanvas" style="display:none;"></canvas>
+
+  <script>
+    const state = {
+      baseColor: null,
+      alpha: null,
+    };
+
+    function setPreview(file, imgId, fileNameId) {
+      const img = document.getElementById(imgId);
+      const fileNameEl = document.getElementById(fileNameId);
+
+      if (!file) {
+        img.removeAttribute('src');
+        fileNameEl.textContent = '';
+        return;
+      }
+
+      fileNameEl.textContent = file.name;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleFileSelect(target, file) {
+      if (!file) return;
+      state[target] = file;
+
+      if (target === 'baseColor') {
+        setPreview(file, 'previewBaseColor', 'fileNameBaseColor');
+      } else if (target === 'alpha') {
+        setPreview(file, 'previewAlpha', 'fileNameAlpha');
+      }
+    }
+
+    function bindInput(inputId, target) {
+      const input = document.getElementById(inputId);
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        handleFileSelect(target, file);
+      });
+    }
+
+    bindInput('fileBaseColor', 'baseColor');
+    bindInput('fileAlpha', 'alpha');
+
+    document.querySelectorAll('.dropzone').forEach((zone) => {
+      const target = zone.getAttribute('data-target');
+
+      zone.addEventListener('click', () => {
+        if (target === 'baseColor') {
+          document.getElementById('fileBaseColor').click();
+        } else if (target === 'alpha') {
+          document.getElementById('fileAlpha').click();
+        }
+      });
+
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('dragover');
+      });
+
+      zone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+      });
+
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        handleFileSelect(target, file);
+      });
+    });
+
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        if (!file) {
+          resolve(null);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = reader.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function drawImageToCanvas(img, width, height) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      return ctx.getImageData(0, 0, width, height);
+    }
+
+    document.getElementById('packBtn').addEventListener('click', async () => {
+      const baseColorFile = state.baseColor;
+      const alphaFile = state.alpha;
+
+      if (!baseColorFile || !alphaFile) {
+        alert('BaseColor画像とAlpha画像の両方を指定してください。');
+        return;
+      }
+
+      try {
+        const baseColorImg = await loadImageFromFile(baseColorFile);
+        const alphaImg = await loadImageFromFile(alphaFile);
+
+        const width = baseColorImg.width;
+        const height = baseColorImg.height;
+
+        const resultCanvas = document.getElementById('resultCanvas');
+        resultCanvas.width = width;
+        resultCanvas.height = height;
+        const resultCtx = resultCanvas.getContext('2d');
+
+        const baseColorData = drawImageToCanvas(baseColorImg, width, height);
+        const alphaData = drawImageToCanvas(alphaImg, width, height);
+
+        const srcBase = baseColorData.data;
+        const srcAlpha = alphaData.data;
+
+        const resultImgData = resultCtx.createImageData(width, height);
+        const dst = resultImgData.data;
+
+        const preferSourceAlpha = document.getElementById('useAlphaImageChannel').checked;
+        const invertAlpha = document.getElementById('invertAlpha').checked;
+
+        for (let i = 0; i < width * height; i++) {
+          const idx = i * 4;
+
+          dst[idx + 0] = srcBase[idx + 0];
+          dst[idx + 1] = srcBase[idx + 1];
+          dst[idx + 2] = srcBase[idx + 2];
+
+          let alphaValue;
+          if (preferSourceAlpha && srcAlpha[idx + 3] !== 255) {
+            alphaValue = srcAlpha[idx + 3];
+          } else {
+            alphaValue = srcAlpha[idx + 0];
+          }
+
+          if (invertAlpha) {
+            alphaValue = 255 - alphaValue;
+          }
+
+          dst[idx + 3] = alphaValue;
+        }
+
+        resultCtx.putImageData(resultImgData, 0, 0);
+
+        const url = resultCanvas.toDataURL('image/png');
+        document.getElementById('resultPreview').src = url;
+
+        const a = document.createElement('a');
+        const baseName = baseColorFile.name.replace(/\.[^.]+$/, '');
+        a.href = url;
+        a.download = `${baseName}_BaseColorAlpha.png`;
+        a.click();
+      } catch (error) {
+        console.error(error);
+        alert('処理中にエラーが発生しました。コンソールを確認してください。');
+      }
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      state.baseColor = null;
+      state.alpha = null;
+
+      document.getElementById('fileBaseColor').value = '';
+      document.getElementById('fileAlpha').value = '';
+      document.getElementById('previewBaseColor').removeAttribute('src');
+      document.getElementById('previewAlpha').removeAttribute('src');
+      document.getElementById('resultPreview').removeAttribute('src');
+      document.getElementById('fileNameBaseColor').textContent = '';
+      document.getElementById('fileNameAlpha').textContent = '';
+      document.getElementById('useAlphaImageChannel').checked = true;
+      document.getElementById('invertAlpha').checked = false;
+    });
+  </script>
+</body>
+</html>
