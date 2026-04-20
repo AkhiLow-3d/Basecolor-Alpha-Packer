@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -132,6 +133,7 @@
     }
   </style>
 </head>
+
 <body>
   <h1>BaseColor + Alpha Packer</h1>
   <p>
@@ -172,11 +174,15 @@
       Alpha画像の元画像Alphaチャンネルを優先して使う（なければR値を使う）
     </label>
     <label class="checkbox">
+      <input type="checkbox" id="convertTransmission" checked />
+      Alpha画像をTransmissionとして扱い、Alpha = 1 - Transmission に変換する
+    </label>
+    <label class="checkbox">
       <input type="checkbox" id="invertAlpha" />
-      Alphaを反転する
+      最終Alphaをさらに反転する
     </label>
     <div class="note">
-      通常はチェック初期値のままでOKです。Alpha画像が白黒画像なら、そのまま使えます。
+      通常はチェック初期値のままでOKです。今回の用途では、白=よく透過する（Transmission高い）として扱い、Alphaはその逆になります。
     </div>
   </div>
 
@@ -189,7 +195,8 @@
     <h2 style="margin-top:0; font-size:18px;">結果プレビュー</h2>
     <img id="resultPreview" alt="Packed Result Preview" />
     <p class="note">
-      出力PNGは RGB = BaseColor、A = Alpha です。UnityではこのPNGを Albedo に入れてください。
+      出力PNGは RGB = BaseColor、A = Alpha です。今回の初期設定では Alpha画像をTransmissionとして扱い、<br />
+      A = 1 - Transmission に変換してから保存します。UnityではこのPNGを Albedo に入れてください。
     </p>
   </div>
 
@@ -332,6 +339,7 @@
         const dst = resultImgData.data;
 
         const preferSourceAlpha = document.getElementById('useAlphaImageChannel').checked;
+        const convertTransmission = document.getElementById('convertTransmission').checked;
         const invertAlpha = document.getElementById('invertAlpha').checked;
 
         for (let i = 0; i < width * height; i++) {
@@ -346,6 +354,10 @@
             alphaValue = srcAlpha[idx + 3];
           } else {
             alphaValue = srcAlpha[idx + 0];
+          }
+
+          if (convertTransmission) {
+            alphaValue = 255 - alphaValue;
           }
 
           if (invertAlpha) {
@@ -383,8 +395,10 @@
       document.getElementById('fileNameBaseColor').textContent = '';
       document.getElementById('fileNameAlpha').textContent = '';
       document.getElementById('useAlphaImageChannel').checked = true;
+      document.getElementById('convertTransmission').checked = true;
       document.getElementById('invertAlpha').checked = false;
     });
   </script>
 </body>
+
 </html>
